@@ -24,7 +24,8 @@ RUN apt-get update --yes && \
     # ln -sfn /usr/bin/python3 /usr/bin/python && \
     # ln -sfn /usr/bin/pip3 /usr/bin/pip && \
     pip install --no-cache-dir jupyterhub==3.0.0 && \
-    pip install --no-cache-dir --upgrade jupyterlab notebook jupyter_server && \
+    pip install --no-cache-dir --upgrade jupyterlab notebook jupyter_server \
+    jupyter_scheduler && \
     python3 -m pip install cartopy catboost metpy minisom netCDF4 pillow \
     pyvista seaborn shapely torch torchaudio torchvision verde xarray \
     --extra-index-url https://download.pytorch.org/whl/cu112 && \
