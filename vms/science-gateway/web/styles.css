@@ -20,11 +20,29 @@ body {
 
 /* Header Styles */
 header {
-  position: relative;  /* Added for positioning DOI */
-  background: linear-gradient(to bottom, #69BBDF, #385252);
-  color: #fff;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-  padding: 80px;
+    /* https://oceancolor.gsfc.nasa.gov/gallery/734/ */
+    background-image: url('banner.jpg');
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    color: white;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.2);
+    padding: 80px;
+    height: 40vh;
+
+    /* Flexbox properties */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center; /* This will horizontally center the content */
+    position: relative;  /* Add this to allow absolute positioning of child elements */
+}
+
+.doi-text {
+    position: absolute;  /* Position it relative to the header */
+    bottom: 10px;  /* Position from the bottom of the header */
+    right: 10px;  /* Position from the right of the header */
+    font-size: 0.8em;
 }
 
 .header-content {
@@ -49,18 +67,14 @@ header {
   vertical-align: middle;
 }
 
-.doi-text {
-  position: absolute;  /* Added for positioning */
-  bottom: 10px;        /* Added for positioning */
-  right: 10px;         /* Added for positioning */
-  font-size: 0.8em;
-}
 
 header h2 {
-  font-size: 1.75em;
-  margin-top: 10px;
-  font-style: italic;
-  text-align: center;
+    font-size: 1.9em;
+    color: white;
+    margin-top: 10px;
+    font-style: normal;
+    text-align: center;
+    font-weight: bold;  /* Add this line to make the text bold */
 }
 
 /* Navigation Styles */
