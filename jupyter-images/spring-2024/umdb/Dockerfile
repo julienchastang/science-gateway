@@ -26,11 +26,11 @@ RUN apt-get update --yes && \
     bokeh \
     build \
     dask \
+    datasets \
     dm-tree \
     flake8 \
     google \
     h5py \
-    ipywidgets \
     ipywidgets \
     isort \
     jax[cpu] \
@@ -55,13 +55,17 @@ RUN apt-get update --yes && \
     pytest-cov \
     requests \
     rich \
+    rouge-score \
     scikit-learn \
     scipy \
+    sentencepiece \
     shapely \
     tensorboard-plugin-profile \
     tf-nightly[and-cuda] \
     torch \
+    torchaudio \
     torchvision \
+    transformers \
     visualkeras \
     xarray \
     --upgrade && \
