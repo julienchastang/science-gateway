@@ -9,6 +9,7 @@ dependencies:
   - nb_conda_kernels
   - python=3.11
   # User requested packages
+  - arm_pyart
   - argopy
   - altair
   - aospy
