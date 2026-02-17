@@ -1,0 +1,21 @@
+hub:
+  services:
+    nblaunch:
+      url: http://nblaunch:8080
+      oauth_no_confirm: true
+      oauth_client_id: service-nblaunch
+      oauth_redirect_uri: https://jupyterhub.unidata.ucar.edu/services/nblaunch/oauth_callback
+
+      apiToken: "<SET_TO_SAME_VALUE_AS nblaunch-secrets:JUPYTERHUB_API_TOKEN>"
+
+  loadRoles:
+    user:
+      scopes:
+        - self
+        - access:services!service=nblaunch
+
+    nblaunch-service:
+      services:
+        - nblaunch
+      scopes:
+        - access:services!service=nblaunch

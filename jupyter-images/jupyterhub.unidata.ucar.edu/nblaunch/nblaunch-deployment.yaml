@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nblaunch
+  labels:
+    app: nblaunch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nblaunch
+  template:
+    metadata:
+      labels:
+        app: nblaunch
+    spec:
+      containers:
+        - name: nblaunch
+          image: unidata/nblauncher:xxx
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+
+          env:
+            - name: PORT
+              value: "8080"
+            - name: JUPYTERHUB_SERVICE_PREFIX
+              value: "/services/nblaunch/"
+            - name: JUPYTERHUB_BASE_URL
+              value: "/"
+            - name: JUPYTERHUB_CLIENT_ID
+              value: "service-nblaunch"
+            - name: JUPYTERHUB_OAUTH_CALLBACK_URL
+              value: "https://jupyterhub.unidata.ucar.edu/services/nblaunch/oauth_callback"
+            - name: JUPYTERHUB_API_URL
+              value: "http://hub:8081/hub/api"
+
+            - name: HOME_ROOT
+              value: "/home"
+
+            - name: TTL_SECONDS
+              value: "300"
+            - name: MAX_NOTEBOOK_BYTES
+              value: "20971520"
+            - name: DEV_MODE
+              value: "0"
+            - name: LOG_LEVEL
+              value: "INFO"
+
+            - name: NBGALLERY_BASE
+              value: "https://nbgallery.ees220002.projects.jetstream-cloud.org"
+
+            - name: JUPYTERHUB_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nblaunch-secrets
+                  key: JUPYTERHUB_API_TOKEN
+            - name: SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nblaunch-secrets
+                  key: SECRET
+            - name: NBGALLERY_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nblaunch-secrets
+                  key: NBGALLERY_SERVICE_TOKEN
+            - name: COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nblaunch-secrets
+                  key: COOKIE_SECRET
+
+          volumeMounts:
+            - name: home-nfs
+              mountPath: /home
+              readOnly: false
+
+      volumes:
+        - name: home-nfs
+          persistentVolumeClaim:
+            claimName: home-nfs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nblaunch
+  labels:
+    app: nblaunch
+spec:
+  selector:
+    app: nblaunch
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
