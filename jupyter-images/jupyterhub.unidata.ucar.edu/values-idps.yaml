@@ -12,6 +12,64 @@ hub:
           return u
       _A.normalize_username = _wrapped
 
+    21-home-subpath.py: |
+      import hashlib
+      import re
+
+      def home_subpath_for(username):
+          u = username.lower()
+          slug = re.sub(r"[^a-z0-9]+", "-", u).strip("-")
+          suffix = hashlib.sha256(u.encode("utf-8")).hexdigest()[:8]
+          return f"{slug}---{suffix}"
+
+      def _set_home_subpath(volume_mounts, subpath):
+          if not volume_mounts:
+              return
+          for mount in volume_mounts:
+              if mount.get("name") == "home-nfs" and mount.get("mountPath") == "/home/jovyan":
+                  mount["subPath"] = subpath
+
+      def pre_spawn_hook(spawner):
+          subpath = home_subpath_for(spawner.user.name)
+          _set_home_subpath(spawner.volume_mounts, subpath)
+
+          for container in (spawner.extra_containers or []):
+              _set_home_subpath(container.get("volumeMounts"), subpath)
+
+      c.Spawner.pre_spawn_hook = pre_spawn_hook
+
+    22-nblaunch-home-subpath-api.py: |
+      import hashlib
+      import json
+      import re
+
+      from jupyterhub.apihandlers.base import APIHandler
+      from tornado import web
+
+      def home_subpath_for(username):
+          u = username.lower()
+          slug = re.sub(r"[^a-z0-9]+", "-", u).strip("-")
+          suffix = hashlib.sha256(u.encode("utf-8")).hexdigest()[:8]
+          return f"{slug}---{suffix}"
+
+      class NBLaunchHomeSubpathHandler(APIHandler):
+          @web.authenticated
+          def get(self):
+              actor = self.current_user
+              actor_name = getattr(actor, "name", "")
+              actor_kind = actor.__class__.__name__.lower()
+              if not (actor_kind == "service" and actor_name == "nblaunch"):
+                  raise web.HTTPError(403, "nblaunch service token required")
+
+              username = self.get_argument("username", default="")
+              if not username:
+                  raise web.HTTPError(400, "username is required")
+
+              self.set_header("Content-Type", "application/json")
+              self.finish(json.dumps({"subpath": home_subpath_for(username)}))
+
+      c.JupyterHub.extra_handlers.append((r"/api/nblaunch/home-subpath", NBLaunchHomeSubpathHandler))
+
   config:
     CILogonOAuthenticator:
       scope:

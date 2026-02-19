@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         app: nblaunch
+        hub.jupyter.org/network-access-hub: "true"
     spec:
       containers:
         - name: nblaunch
@@ -61,11 +62,6 @@ spec:
                 secretKeyRef:
                   name: nblaunch-secrets
                   key: SECRET
-            - name: NBGALLERY_SERVICE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: nblaunch-secrets
-                  key: NBGALLERY_SERVICE_TOKEN
             - name: COOKIE_SECRET
               valueFrom:
                 secretKeyRef:

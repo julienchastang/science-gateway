@@ -22,8 +22,10 @@ logger = logging.getLogger("nblaunch")
 
 HMAC_SECRET = os.environ["SECRET"].encode("utf-8")
 NBGALLERY_BASE = os.environ["NBGALLERY_BASE"].rstrip("/")
-NBGALLERY_SERVICE_TOKEN = os.environ["NBGALLERY_SERVICE_TOKEN"]
 HOME_ROOT = pathlib.Path(os.environ.get("HOME_ROOT", "/home"))
+JUPYTERHUB_API_URL = os.environ["JUPYTERHUB_API_URL"].rstrip("/")
+JUPYTERHUB_API_TOKEN = os.environ["JUPYTERHUB_API_TOKEN"]
+HOME_SUBPATH_API_PATH = os.environ.get("HOME_SUBPATH_API_PATH", "/nblaunch/home-subpath")
 TTL_SECONDS = int(os.environ.get("TTL_SECONDS", "300"))
 PORT = int(os.environ.get("PORT", "8080"))
 SERVICE_PREFIX = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
@@ -37,6 +39,7 @@ NBGALLERY_USER_AGENT = os.environ.get(
 )
 
 NB_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
+SUBPATH_PATTERN = re.compile(r"^[a-z0-9-]+---[0-9a-f]{8}$")
 
 
 class NotebookTooLargeError(Exception):
@@ -47,43 +50,37 @@ def _resolve_user_home(username: str) -> pathlib.Path:
     if not username or "/" in username or "\\" in username or "\x00" in username:
         raise tornado.web.HTTPError(400, "invalid username path")
 
-    base_root = HOME_ROOT.resolve()
-
-    # JupyterHub/KubeSpawner safe slug directories often look like:
-    # "<slugified-username>---<hash>".
-    slug = re.sub(r"[^a-z0-9]+", "-", username.lower()).strip("-")
-    if slug:
-        candidates = []
-        for p in HOME_ROOT.glob(f"{slug}---*"):
-            try:
-                rp = p.resolve()
-                rp.relative_to(base_root)
-            except ValueError:
-                continue
-            if rp.is_dir():
-                candidates.append(rp)
-        if candidates:
-            candidates.sort(key=lambda p: p.name)
-            if len(candidates) > 1:
-                logger.warning(
-                    "Multiple home directories matched for user=%s slug=%s; using %s",
-                    username,
-                    slug,
-                    candidates[0],
-                )
-            return candidates[0]
-
-    # Backward-compatible direct username directory.
-    raw_dir = (HOME_ROOT / username).resolve()
+    endpoint = f"{JUPYTERHUB_API_URL}{HOME_SUBPATH_API_PATH}"
+    headers = {"Authorization": f"token {JUPYTERHUB_API_TOKEN}"}
     try:
-        raw_dir.relative_to(base_root)
+        resp = requests.get(endpoint, headers=headers, params={"username": username}, timeout=10)
+    except requests.RequestException as exc:
+        raise tornado.web.HTTPError(502, "failed to resolve user home from Hub API") from exc
+
+    if resp.status_code == 404:
+        raise tornado.web.HTTPError(404, "user home mapping not found")
+    if resp.status_code >= 400:
+        raise tornado.web.HTTPError(502, f"Hub API home mapping failed with status {resp.status_code}")
+
+    try:
+        payload = resp.json()
+    except ValueError as exc:
+        raise tornado.web.HTTPError(502, "invalid response from Hub API home mapping endpoint") from exc
+
+    subpath = payload.get("subpath", "")
+    if not isinstance(subpath, str) or not SUBPATH_PATTERN.match(subpath):
+        raise tornado.web.HTTPError(502, "Hub API returned invalid home subpath")
+
+    base_root = HOME_ROOT.resolve()
+    deterministic_dir = (HOME_ROOT / subpath).resolve()
+    try:
+        deterministic_dir.relative_to(base_root)
     except ValueError as exc:
         raise tornado.web.HTTPError(400, "invalid username path") from exc
-    if raw_dir.exists() and raw_dir.is_dir():
-        return raw_dir
+    if deterministic_dir.exists() and deterministic_dir.is_dir():
+        return deterministic_dir
 
-    logger.warning("No existing home directory found for user=%s; falling back to raw path %s", username, raw_dir)
-    return raw_dir
+    raise tornado.web.HTTPError(404, f"user home directory not found for {username}")
 
 
 class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
@@ -102,7 +99,8 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
 
         self._validate_request(nb=nb, ts_raw=ts_raw, sig=sig)
         notebook_bytes = await self._download_notebook(nb)
-        destination = self._write_notebook(username=username, nb=nb, payload=notebook_bytes)
+        user_root = await asyncio.to_thread(_resolve_user_home, username)
+        destination = self._write_notebook(user_root=user_root, nb=nb, payload=notebook_bytes)
 
         logger.info("Notebook %s written for user=%s to %s", nb, username, destination)
         target = url_path_join(
@@ -150,7 +148,7 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
         url = f"{NBGALLERY_BASE}/notebooks/{quote(nb, safe='')}/download"
         params = {"clickstream": "false"}
         headers = {"User-Agent": NBGALLERY_USER_AGENT}
-        with requests.get(url, headers=headers, params=params, timeout=30, stream=False) as resp:
+        with requests.get(url, headers=headers, params=params, timeout=30) as resp:
             resp.raise_for_status()
 
             content_type = (resp.headers.get("Content-Type") or "").lower()
@@ -170,9 +168,7 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
                 raise NotebookTooLargeError("streamed payload exceeds limit")
             return payload
 
-    def _write_notebook(self, username: str, nb: str, payload: bytes) -> pathlib.Path:
-        user_root = _resolve_user_home(username)
-
+    def _write_notebook(self, user_root: pathlib.Path, nb: str, payload: bytes) -> pathlib.Path:
         dst_dir = user_root / "nbgallery"
         dst_dir.mkdir(parents=True, exist_ok=True)
         dst_path = dst_dir / f"{nb}.ipynb"
@@ -212,7 +208,6 @@ def main() -> None:
     app = make_app()
     app.listen(PORT)
     logger.info("nblaunch listening on port %s", PORT)
-    logger.info("JUPYTERHUB_CLIENT_ID=%s", os.environ.get("JUPYTERHUB_CLIENT_ID", ""))
     tornado.ioloop.IOLoop.current().start()
 
 
