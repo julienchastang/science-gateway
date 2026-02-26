@@ -9,11 +9,11 @@ import re
 import time
 from urllib.parse import quote
 
+from jupyterhub.services.auth import HubOAuthCallbackHandler, HubOAuthenticated
+from jupyterhub.utils import url_path_join
 import requests
 import tornado.ioloop
 import tornado.web
-from jupyterhub.services.auth import HubOAuthenticated, HubOAuthCallbackHandler
-from jupyterhub.utils import url_path_join
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
