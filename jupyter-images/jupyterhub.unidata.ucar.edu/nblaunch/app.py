@@ -7,6 +7,7 @@ import os
 import pathlib
 import re
 import time
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from jupyterhub.services.auth import HubOAuthCallbackHandler, HubOAuthenticated
@@ -42,6 +43,13 @@ NBGALLERY_USER_AGENT = os.environ.get(
 
 NB_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 SUBPATH_PATTERN = re.compile(r"^[a-z0-9-]+---[0-9a-f]{8}$")
+
+# Type-checker workaround: HubOAuthenticated and RequestHandler expose
+# incompatible xsrf_token types; keep runtime inheritance unchanged.
+if TYPE_CHECKING:
+    RequestHandlerBase = Any
+else:
+    RequestHandlerBase = tornado.web.RequestHandler
 
 
 class NotebookTooLargeError(Exception):
@@ -93,8 +101,10 @@ def _resolve_user_home(username: str) -> pathlib.Path:
     raise tornado.web.HTTPError(404, f"user home directory not found for {username}")
 
 
-class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
-    hub_scopes = {"access:services!service=nblaunch"}
+class LaunchHandler(HubOAuthenticated, RequestHandlerBase):
+    @property
+    def hub_scopes(self):
+        return {"access:services!service=nblaunch"}
 
     async def get(self):
         user = self.get_current_user()
