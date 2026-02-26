@@ -25,7 +25,9 @@ NBGALLERY_BASE = os.environ["NBGALLERY_BASE"].rstrip("/")
 HOME_ROOT = pathlib.Path(os.environ.get("HOME_ROOT", "/home"))
 JUPYTERHUB_API_URL = os.environ["JUPYTERHUB_API_URL"].rstrip("/")
 JUPYTERHUB_API_TOKEN = os.environ["JUPYTERHUB_API_TOKEN"]
-HOME_SUBPATH_API_PATH = os.environ.get("HOME_SUBPATH_API_PATH", "/nblaunch/home-subpath")
+HOME_SUBPATH_API_PATH = os.environ.get(
+    "HOME_SUBPATH_API_PATH", "/nblaunch/home-subpath"
+)
 TTL_SECONDS = int(os.environ.get("TTL_SECONDS", "300"))
 PORT = int(os.environ.get("PORT", "8080"))
 SERVICE_PREFIX = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
@@ -53,19 +55,27 @@ def _resolve_user_home(username: str) -> pathlib.Path:
     endpoint = f"{JUPYTERHUB_API_URL}{HOME_SUBPATH_API_PATH}"
     headers = {"Authorization": f"token {JUPYTERHUB_API_TOKEN}"}
     try:
-        resp = requests.get(endpoint, headers=headers, params={"username": username}, timeout=10)
+        resp = requests.get(
+            endpoint, headers=headers, params={"username": username}, timeout=10
+        )
     except requests.RequestException as exc:
-        raise tornado.web.HTTPError(502, "failed to resolve user home from Hub API") from exc
+        raise tornado.web.HTTPError(
+            502, "failed to resolve user home from Hub API"
+        ) from exc
 
     if resp.status_code == 404:
         raise tornado.web.HTTPError(404, "user home mapping not found")
     if resp.status_code >= 400:
-        raise tornado.web.HTTPError(502, f"Hub API home mapping failed with status {resp.status_code}")
+        raise tornado.web.HTTPError(
+            502, f"Hub API home mapping failed with status {resp.status_code}"
+        )
 
     try:
         payload = resp.json()
     except ValueError as exc:
-        raise tornado.web.HTTPError(502, "invalid response from Hub API home mapping endpoint") from exc
+        raise tornado.web.HTTPError(
+            502, "invalid response from Hub API home mapping endpoint"
+        ) from exc
 
     subpath = payload.get("subpath", "")
     if not isinstance(subpath, str) or not SUBPATH_PATTERN.match(subpath):
@@ -100,7 +110,9 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
         self._validate_request(nb=nb, ts_raw=ts_raw, sig=sig)
         notebook_bytes = await self._download_notebook(nb)
         user_root = await asyncio.to_thread(_resolve_user_home, username)
-        destination = self._write_notebook(user_root=user_root, nb=nb, payload=notebook_bytes)
+        destination = self._write_notebook(
+            user_root=user_root, nb=nb, payload=notebook_bytes
+        )
 
         logger.info("Notebook %s written for user=%s to %s", nb, username, destination)
         target = url_path_join(
@@ -116,7 +128,9 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
 
     def _validate_request(self, nb: str, ts_raw: str, sig: str) -> None:
         if not nb or not ts_raw or not sig:
-            raise tornado.web.HTTPError(400, "missing required query params: nb, ts, sig")
+            raise tornado.web.HTTPError(
+                400, "missing required query params: nb, ts, sig"
+            )
         if not NB_ID_PATTERN.match(nb):
             raise tornado.web.HTTPError(400, "invalid nb")
 
@@ -138,7 +152,9 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
         try:
             return await asyncio.to_thread(self._download_notebook_blocking, nb)
         except NotebookTooLargeError as exc:
-            raise tornado.web.HTTPError(413, "notebook exceeds MAX_NOTEBOOK_BYTES") from exc
+            raise tornado.web.HTTPError(
+                413, "notebook exceeds MAX_NOTEBOOK_BYTES"
+            ) from exc
         except requests.RequestException as exc:
             url = f"{NBGALLERY_BASE}/notebooks/{quote(nb, safe='')}/download?clickstream=false"
             logger.exception("Failed downloading notebook nb=%s from %s", nb, url)
@@ -153,7 +169,9 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
 
             content_type = (resp.headers.get("Content-Type") or "").lower()
             if "text/html" in content_type:
-                raise requests.RequestException(f"NBGallery returned HTML for notebook download from {url}")
+                raise requests.RequestException(
+                    f"NBGallery returned HTML for notebook download from {url}"
+                )
 
             content_length = resp.headers.get("Content-Length")
             if content_length is not None:
@@ -168,7 +186,9 @@ class LaunchHandler(HubOAuthenticated, tornado.web.RequestHandler):
                 raise NotebookTooLargeError("streamed payload exceeds limit")
             return payload
 
-    def _write_notebook(self, user_root: pathlib.Path, nb: str, payload: bytes) -> pathlib.Path:
+    def _write_notebook(
+        self, user_root: pathlib.Path, nb: str, payload: bytes
+    ) -> pathlib.Path:
         dst_dir = user_root / "nbgallery"
         dst_dir.mkdir(parents=True, exist_ok=True)
         dst_path = dst_dir / f"{nb}.ipynb"
@@ -191,7 +211,9 @@ def make_app() -> tornado.web.Application:
             cookie_secret = "nblaunch-dev-cookie-secret"
             logger.warning("DEV_MODE=1 set; using insecure development COOKIE_SECRET")
         else:
-            raise RuntimeError("COOKIE_SECRET must be set (or set DEV_MODE=1 for local development)")
+            raise RuntimeError(
+                "COOKIE_SECRET must be set (or set DEV_MODE=1 for local development)"
+            )
 
     prefix = SERVICE_PREFIX
     return tornado.web.Application(
