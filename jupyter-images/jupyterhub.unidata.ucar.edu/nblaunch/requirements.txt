@@ -1,3 +1,5 @@
+# Runtime dependencies are canonical in pyproject.toml [project.dependencies].
+# Keep this file in sync for environments that still install via requirements.txt.
 jupyterhub>=4.0
 requests>=2.31
 tornado>=6.3
